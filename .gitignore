@@ -1,0 +1,69 @@
+# ── Datos (licencia restringida, no redistribuir) ─────────────────────────────
+data/
+
+# ── Modelos y checkpoints ─────────────────────────────────────────────────────
+models/
+*.pt
+*.pth
+*.tar
+*.bin
+*.ckpt
+checkpoints/
+
+# ── Salidas de experimentos ───────────────────────────────────────────────────
+outputs/
+results/
+experiments/
+Graficos/outputs/
+
+# ── Código obsoleto (interno) ─────────────────────────────────────────────────
+deprecated/
+
+# ── Literatura (PDFs con copyright) ──────────────────────────────────────────
+Libros/
+Papers/
+*.pdf
+
+# ── Archivos internos del proyecto ────────────────────────────────────────────
+misc/
+*.docx
+*.doc
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Entornos virtuales ────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+.env
+
+# ── Credenciales y secretos ───────────────────────────────────────────────────
+.git-credentials
+*.token
+*.key
+*.pem
+secrets.*
+
+# ── Logs y temporales ─────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
