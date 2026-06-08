@@ -27,7 +27,7 @@ informes basado en recuperación de literatura médica:
 
 - **LLM**: Qwen2.5-7B-Instruct (descargado por separado desde Hugging Face).
 - **RAG**: índice FAISS sobre literatura médica (ACR BI-RADS Atlas + artículos de referencia)
-  con embeddings de `sentence-transformers`.
+  con embeddings de `NeuML/pubmedbert-base-embeddings` (cargado vía HuggingFace `transformers`).
 - **Diseño de seguridad clínica**: el informe se construye exclusivamente a partir de las
   predicciones del modelo (BI-RADS + densidad + recomendación). No se generan hallazgos
   morfológicos específicos (forma de masa, morfología de calcificaciones) porque el modelo
@@ -151,6 +151,43 @@ Si utilizas este trabajo en tu investigación, por favor cítalo como:
   note      = {Director: Noel Pérez-Pérez, PhD}
 }
 ```
+
+---
+
+## Atribuciones y referencias
+
+### Datasets
+
+- **VinDr-Mammo.** Nguyen, H.T., Nguyen, H.Q., Pham, H.H., Lam, K., Le, L.T., Dao, M., & Vu, V.
+  (2023). VinDr-Mammo: A large-scale benchmark dataset for computer-aided diagnosis in
+  full-field digital mammography. *Scientific Data*, 10, 277.
+  https://doi.org/10.1038/s41597-023-02100-7
+
+### Modelos preentrenados
+
+- **Mammo-CLIP.** Ghosh, S., Poynton, C.B., Visweswaran, S., & Batmanghelich, K. (2024).
+  Mammo-CLIP: A Vision Language Foundation Model to Enhance Data Efficiency and Robustness
+  in Mammography. En *MICCAI 2024*, LNCS vol. 15012. Springer.
+  https://doi.org/10.1007/978-3-031-72390-2_59
+- **Qwen2.5.** Qwen Team, Yang, A., et al. (2025). Qwen2.5 Technical Report. arXiv:2412.15115.
+  https://doi.org/10.48550/arXiv.2412.15115
+- **EfficientNet.** Tan, M., & Le, Q.V. (2019). EfficientNet: Rethinking Model Scaling for
+  Convolutional Neural Networks. En *ICML 2019*, pp. 6105–6114. arXiv:1905.11946
+
+### Métodos y estándares clínicos
+
+- **SORD.** Diaz, R., & Marathe, A. (2019). Soft Labels for Ordinal Regression. En *CVPR 2019*,
+  pp. 4738–4747. DOI: 10.1109/CVPR.2019.00487
+- **ACR BI-RADS Atlas.** American College of Radiology. (2013). *ACR BI-RADS Atlas: Breast
+  Imaging Reporting and Data System* (5.ª ed.). Reston, VA: American College of Radiology.
+
+### Herramientas y librerías principales
+
+- **PyTorch** — framework de aprendizaje profundo.
+- **Transformers (Hugging Face)** — carga y uso de Qwen2.5 y del modelo de embeddings RAG.
+- **FAISS (Facebook AI Research)** — índice de recuperación vectorial del RAG.
+- **pydicom** — lectura y decodificación de imágenes DICOM.
+- **efficientnet_pytorch** — backbone EfficientNet-B5 compatible con Mammo-CLIP.
 
 ---
 
