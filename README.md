@@ -180,6 +180,10 @@ Si utilizas este trabajo en tu investigación, por favor cítalo como:
   pp. 4738–4747. DOI: 10.1109/CVPR.2019.00487
 - **ACR BI-RADS Atlas.** American College of Radiology. (2013). *ACR BI-RADS Atlas: Breast
   Imaging Reporting and Data System* (5.ª ed.). Reston, VA: American College of Radiology.
+- **Litvinov et al.** Litvinov, A., Ushakov, E., Senotrusova, S., Lukianov, K., Markin, Y.,
+  Mikhailova, L., & Karpulevich, E. (2026). Clinically Aware Learning: Ordinal Loss Improves
+  Medical Image Classifiers. *Journal of Clinical Medicine*, 15(1), 365.
+  https://doi.org/10.3390/jcm15010365
 
 ### Herramientas y librerías principales
 
