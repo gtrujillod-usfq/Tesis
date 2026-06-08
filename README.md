@@ -184,6 +184,9 @@ Si utilizas este trabajo en tu investigación, por favor cítalo como:
   Mikhailova, L., & Karpulevich, E. (2026). Clinically Aware Learning: Ordinal Loss Improves
   Medical Image Classifiers. *Journal of Clinical Medicine*, 15(1), 365.
   https://doi.org/10.3390/jcm15010365
+- **Focal Loss.** Lin, T.-Y., Goyal, P., Girshick, R., He, K., & Dollár, P. (2017). Focal Loss
+  for Dense Object Detection. En *ICCV 2017*, pp. 2980–2988. arXiv:1708.02002.
+  https://doi.org/10.1109/ICCV.2017.324
 
 ### Herramientas y librerías principales
 
