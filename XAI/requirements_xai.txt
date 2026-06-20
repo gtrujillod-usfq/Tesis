@@ -1,0 +1,29 @@
+# requirements_xai.txt
+# Dependencias adicionales del subsistema XAI
+# Las dependencias de Tesis/requirements.txt ya deben estar instaladas.
+#
+# Instalacion:
+#   pip install -r requirements.txt           # dependencias base del proyecto
+#   pip install -r XAI/requirements_xai.txt  # dependencias adicionales XAI
+#
+# NOTA sobre shap: el Shapley sobre los 3 chunks RAG NO usa la libreria shap.
+# Con k=3 hay exactamente 8 subconjuntos; se enumeran de forma manual y exacta.
+# Esto elimina la dependencia de shap y evita la aproximacion de kernel SHAP.
+#
+# NOTA sobre el modelo NLI: se carga via transformers (ya en requirements.txt).
+# Modelo recomendado para grounding multilingue en espanol:
+#   cross-encoder/nli-MiniLM2-L6-H768  (en ingles, robusto)
+#   o typeform/distilbert-base-uncased-mnli (ligero)
+# Se evalua en el Paso 4 cual tiene mejor cobertura sobre textos en espanol
+# mezclados con terminologia medica en ingles (chunks PubMedBERT son en ingles).
+
+# Atribucion de vision (Integrated Gradients y Grad-CAM)
+captum>=0.7.0
+
+# El resto de dependencias XAI ya esta cubierto por requirements.txt:
+#   transformers>=4.57.6   (modelo NLI y Qwen2.5)
+#   torch>=2.6.0           (forward hooks para Grad-CAM)
+#   numpy>=2.0.2           (manipulacion de mapas de atribucion)
+#   pandas>=2.2.2          (tablas de metricas)
+#   matplotlib>=3.10.0     (figuras de saliencia)
+#   scikit-learn>=1.6.1    (AUC para Deletion AUC)

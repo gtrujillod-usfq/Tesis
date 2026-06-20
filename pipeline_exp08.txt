@@ -1,0 +1,405 @@
+================================================================================
+PIPELINE END-TO-END MammoVLM V2 -- Experimento exp08
+================================================================================
+Fuente de verdad: experiment_detail.json, data_loading.py, models.py,
+                  rag.py, report_generator.py, threshold_tuning.py,
+                  seccion 7 del main.ipynb
+
+================================================================================
+NODO 1 -- ENTRADA: Imagen DICOM
+================================================================================
+Archivo        : data_loading.py:148-166 (load_image_as_pil)
+Entrada        : ruta .dicom
+                 e.g. data/vindr-mammo/images/{study_id}/{image_id}.dicom
+Formato        : DICOM 16-bit monocanal (MONOCHROME1 o MONOCHROME2)
+Lectura        : pydicom.dcmread(path) -> ds.pixel_array -> array uint16 [H, W]
+                 (H y W variables segun el equipo/imagen)
+Salida         : array numpy uint16 [H, W], valores en rango dinamico del equipo
+
+================================================================================
+NODO 2 -- PREPROCESAMIENTO DICOM -> PIL RGB
+================================================================================
+Archivo        : data_loading.py:169-213 (_load_dicom_as_pil)
+
+Pasos en orden exacto:
+
+  2a. VOI LUT (windowing)
+      Operacion : _apply_voi_lut(arr, ds) de pydicom
+                  Mapea rango 16-bit al rango de visualizacion usando los
+                  parametros de ventana del equipo (clinicamente correcto).
+                  Si falla, continua con el array crudo.
+      Salida    : array float32 [H, W] en rango de ventana clinica
+
+  2b. Inversion MONOCHROME1
+      Operacion : si ds.PhotometricInterpretation == "MONOCHROME1"
+                      arr = arr.max() - arr
+                  (invierte la escala para que tejido denso quede claro)
+      Salida    : array float32 [H, W] en convencion MONOCHROME2
+
+  2c. Normalizacion min-max -> uint8
+      Operacion : arr = (arr - arr.min()) / (arr.max() - arr.min()) * 255.0
+                  cast a uint8
+      Salida    : array uint8 [H, W] con valores [0, 255]
+
+  2d. Conversion a PIL RGB
+      Operacion : Image.fromarray(arr).convert("RGB")
+                  Replica el canal gris 3 veces.
+      Salida    : PIL Image RGB [H, W, 3]
+
+================================================================================
+NODO 3 -- PREPROCESAMIENTO VISUAL (MammoCLIPTransform)
+================================================================================
+Archivo        : data_loading.py:48-141 (MammoCLIPTransform.__call__, apply_clahe)
+Configuracion  : augment=False, use_clahe=True (inferencia)
+
+Pasos en orden exacto:
+
+  3a. CLAHE (data_loading.py:116-141)
+      Entrada   : PIL RGB [H, W, 3]
+      Operacion : .convert("L") -> array [H, W]
+                  cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                  clahe.apply(arr)
+                  np.stack([enhanced]*3, axis=-1) -> Image.fromarray(...)
+      Salida    : PIL RGB [H, W, 3] con contraste local realzado
+
+  3b. Resize (data_loading.py:88)
+      Operacion : T.Resize((1520, 912))   [alto=1520, ancho=912]
+      Salida    : PIL RGB [1520, 912, 3]
+
+  3c. ToTensor (data_loading.py:99)
+      Operacion : T.ToTensor()
+                  Convierte PIL uint8 [H,W,C] a float32 [C,H,W], divide por 255
+      Salida    : tensor float32 [3, 1520, 912], valores [0.0, 1.0]
+
+  3d. Normalizacion ImageNet (data_loading.py:100)
+      Operacion : T.Normalize(mean=(0.485, 0.456, 0.406),
+                               std =(0.229, 0.224, 0.225))
+      Salida    : tensor float32 [3, 1520, 912] (valores tipicos [-2.1, 2.6])
+
+  3e. Batch dimension (main.ipynb linea ~1364)
+      Operacion : .unsqueeze(0).to(device)
+      SALIDA FINAL DEL NODO: tensor [1, 3, 1520, 912] en GPU
+
+================================================================================
+NODO 4 -- ENCODER VISUAL (Mammo-CLIP / EfficientNet-B5)
+================================================================================
+Archivo        : models.py:195-214 (MammoCLIPEncoder.forward)
+Entrada        : tensor [1, 3, 1520, 912]
+
+  4a. Extract features
+      Operacion : self.backbone.extract_features(images)
+                  API de libreria efficientnet_pytorch (lukemelas)
+      Salida    : mapa espacial [1, 2048, h', w']
+                  (h' y w' aproximadamente 48x29 con stride 32 de EfficientNet-B5;
+                   no directamente legible del codigo -- depende del stride acumulado)
+
+  4b. Global Average Pooling (models.py:213)
+      Operacion : F.adaptive_avg_pool2d(feature_map, 1).squeeze(-1).squeeze(-1)
+      Salida    : [1, 2048]
+
+Estado de congelamiento (exp08 -- unfreeze_last_n_blocks=2):
+  - Bloques MBConv [0 ... N-3] : CONGELADOS (requires_grad=False)
+  - Ultimos 2 bloques MBConv   : DESCONGELADOS (models.py:179-181)
+  - _conv_head y _bn1          : DESCONGELADOS (models.py:185-189)
+  - ~9M parametros entrenables (confirmado en experiment_detail.json)
+
+SALIDA DEL NODO: vector de features [1, 2048] float32
+
+================================================================================
+NODO 5 -- CABEZAS DE CLASIFICACION (Dual-Head)
+================================================================================
+Archivo        : models.py:221-243 (ClassificationHead)
+                 models.py:287-300 (inicializacion en MammoVLM)
+Entrada        : mismo vector [1, 2048] para ambas cabezas
+
+Arquitectura de cada cabeza (ClassificationHead):
+  Linear(input_dim=2048, hidden_dim=256)
+  -> LayerNorm(256)
+  -> GELU()
+  -> Dropout(p=0.2)
+  -> Linear(256, num_classes)
+
+Cabeza BI-RADS (models.py:287-292):
+  [1, 2048] -> [1, 256] -> [1, 5] logits
+  Clases: indices 0-4 = BI-RADS 1, 2, 3, 4, 5
+
+Cabeza Densidad (models.py:294-300):
+  [1, 2048] -> [1, 256] -> [1, 4] logits
+  Clases: indices 0-3 = Densidad A, B, C, D
+
+SALIDA DEL NODO:
+  outputs["birads"]  : [1, 5] logits (sin normalizar)
+  outputs["density"] : [1, 4] logits (sin normalizar)
+
+================================================================================
+NODO 6 -- POSTPROCESAMIENTO DE CLASIFICACION
+================================================================================
+Archivo        : main.ipynb seccion 7.4 (funcion generar_informe_para_imagen)
+                 models.py:327-368 (predict)
+
+  6a. Softmax
+      birads_probs  = F.softmax(outputs['birads'][0],  dim=-1)  -> [5] probs
+      density_probs = F.softmax(outputs['density'][0], dim=-1)  -> [4] probs
+
+  6b. ArgMax (clasificacion multiclase pura)
+      birads_idx  = int(torch.argmax(birads_probs))   -> entero {0,1,2,3,4}
+      density_idx = int(torch.argmax(density_probs))  -> entero {0,1,2,3}
+      birads_conf = float(birads_probs[birads_idx])   -> confianza [0,1]
+
+  6c. Score de malignidad (main.ipynb ~linea 1377-1378)
+      Formula exacta del codigo:
+        malignancy_score = float(birads_probs[3].item() + birads_probs[4].item())
+      Semantica: P(BI-RADS 4) + P(BI-RADS 5) = probabilidad acumulada
+                 de categorias sospechosas/malignas
+      Rango: [0.0, 1.0]
+
+  6d. Threshold Tuning -- Camino B (threshold_tuning.py:56-90)
+      Umbral exp08 : 0.120
+                     (elegido sobre validacion maximizando indice de Youden;
+                      archivo threshold_tuning_camino_b_2026-06-06_04-23-39.json)
+      Decision     : si malignancy_score >= 0.120  -> caso SOSPECHOSO/MALIGNO
+                     si malignancy_score <  0.120  -> caso BENIGNO
+      Metricas en test con umbral 0.120:
+        Sensibilidad: 0.7576   FN: 48   Especificidad: 0.7007   FP: 1138
+
+      Produce dos reportes paralelos:
+        ArgMax puro : BI-RADS 1-5 multiclase (sensibilidad 0.37, especificidad 0.98)
+        Camino B    : benigno vs. sospechoso  (sensibilidad 0.76, especificidad 0.70)
+
+SALIDA DEL NODO:
+  birads_idx (0-4), density_idx (0-3), birads_conf (float),
+  malignancy_score (float), decision binaria Camino B
+
+  NOTA: el informe usa ArgMax para el nivel BI-RADS 1-5 e incorpora
+  malignancy_score como campo adicional. El umbral Camino B es para
+  analisis de cribado; no reemplaza el ArgMax en el informe.
+
+================================================================================
+NODO 7 -- CONVERSION A NIVEL CLINICO Y RESOLUCION DE DENSIDAD
+================================================================================
+Archivo        : report_generator.py:224-237
+
+  birads_level = birads_idx + 1   (indice 0-4 -> nivel clinico 1-5)
+  density_desc, density_note = _resolve_density(prediction)
+    -> mapea indice 0-3 a texto ACR en espanol:
+       0 -> "mamas casi enteramente grasas (ACR A)"
+       1 -> "densidades fibroglandulares dispersas (ACR B)"
+       2 -> "tejido mamario heterogeneamente denso (ACR C)"
+       3 -> "tejido mamario extremadamente denso (ACR D)"
+    -> density_note: nota clinica si densidad es C o D (riesgo independiente)
+  recommendation = lexicon.get_recommendation_for_birads(birads_level)
+    -> recomendacion ACR estandar para ese nivel BI-RADS
+
+================================================================================
+NODO 8 -- CONSTRUCCION DE LA QUERY RAG
+================================================================================
+Archivo        : rag.py:708-743 (build_query_from_findings)
+                 llamado desde report_generator.py:248-252
+
+Entrada        : birads_level (int 1-5)
+                 findings=[]  (VACIO -- el modelo no predice morfologia)
+                 density=density_desc (texto ACR)
+
+Construccion de la query:
+  parts = ["mammography"]
+  + f"BI-RADS {birads_level}"
+  + density_desc
+  + keywords segun nivel:
+      BR 1-2 -> "benign routine screening"
+      BR 3   -> "probably benign follow-up"
+      BR 4   -> "suspicious biopsy recommended"
+      BR 5   -> "highly suggestive malignancy immediate biopsy"
+
+Salida         : string en ingles, e.g.:
+  "mammography BI-RADS 4 tejido mamario heterogeneamente denso (ACR C)
+   suspicious biopsy recommended"
+
+================================================================================
+NODO 9 -- RAG (Recuperacion)
+================================================================================
+Archivo        : rag.py:414-706
+
+  9a. Embedding de la query (rag.py:447-483)
+      Modelo    : NeuML/pubmedbert-base-embeddings
+                  (BERT-base especializado en biomedicina, 768-dim)
+      Token.    : max_length=512, truncation=True, padding=True
+      Encode    : last_hidden_state -> mean pooling con mascara de atencion
+                  -> L2-normalize -> [1, 768]
+
+  9b. Busqueda FAISS (rag.py:683-705)
+      Indice    : faiss.IndexFlatIP con vectores normalizados
+                  (equivale a cosine similarity)
+      Top-k     : 3   (rag_top_k=3 en ReportGenerator, notebook seccion 7.3)
+                  NOTA: la constante TOP_K=5 en rag.py es el default del
+                  retriever, pero ReportGenerator la sobreescribe con 3.
+      Score min : 0.3
+      Corpus    : PDFs en Libros/ -- literatura medica de referencia
+                  (ACR BI-RADS Atlas 5a ed., guias clinicas,
+                   textos de radiologia mamaria)
+                  Chunks de ~400 tokens con 15% overlap (~60 tokens)
+
+Salida         : lista de 3 dicts
+                 {text, score, source, page, chapter, section}
+
+================================================================================
+NODO 10 -- CONSTRUCCION DEL PROMPT
+================================================================================
+Archivo        : report_generator.py:55-159  (PromptBuilder)
+                 report_generator.py:255-313 (_generate_with_llm)
+                 rag.py:746-816              (augment_prompt)
+
+Estructura del prompt final (formato ChatML de Qwen):
+
+  <|im_start|>system
+  [Rol: radiologo mamografo + SOLO ESPANOL + anti-alucinacion]
+  <|im_end|>
+
+  [BLOQUE RAG insertado por augment_prompt -- ENTRE system y user]
+  CONTEXTO DE LITERATURA MEDICA:
+  [Referencia 1 - {source}, p.{page}]
+  {texto chunk 1}
+  ...
+  [Referencia 3 - {source}, p.{page}]
+  {texto chunk 3}
+  FIN DEL CONTEXTO DE REFERENCIA
+
+  <|im_start|>user
+  INFORMACION PROPORCIONADA POR EL MODELO:
+  - Categoria BI-RADS: {nivel 1-5} (confianza: {conf:.2f})
+  - Composicion mamaria: {density_desc}
+  [- Nota sobre la densidad: {nota si C o D}]
+  - Score de riesgo de malignidad estimado: {malignancy_score:.2f} (P(BR4-5))
+  - Recomendacion clinica estandar para BI-RADS {nivel}: {recomendacion ACR}
+
+  Redacte un informe mamografico profesional en 5 secciones
+  (TECNICA, COMPOSICION MAMARIA, HALLAZGOS, IMPRESION, RECOMENDACION),
+  usando terminologia ACR BI-RADS, SIN fabricar morfologias no
+  proporcionadas, TODO en espanol.
+  <|im_end|>
+
+  <|im_start|>assistant
+
+================================================================================
+NODO 11 -- LLM (Qwen2.5-7B-Instruct)
+================================================================================
+Archivo        : report_generator.py:423-448 (load_llm_for_generation)
+                 report_generator.py:285-378 (_generate_with_llm, _run_generation)
+
+Carga (report_generator.py:423-448):
+  AutoModelForCausalLM.from_pretrained(
+      "Qwen/Qwen2.5-7B-Instruct",
+      torch_dtype=bfloat16,
+      device_map="auto"
+  )
+  Precision: bfloat16
+
+Parametros de generacion (report_generator.py:330-350):
+  max_new_tokens   = 500
+  do_sample        = True
+  temperature      = 0.1
+  top_p            = 0.9
+  repetition_penalty = 1.1
+  pad_token_id     = tokenizer.eos_token_id
+
+Filtros post-generacion -- anti-fuga de idioma (report_generator.py:316-378):
+  1. Detecta caracteres CJK:
+       Unicode 4E00-9FFF  (CJK Unified Ideographs)
+       Unicode 3040-30FF  (Hiragana / Katakana)
+       Unicode AC00-D7AF  (Hangul)
+  2. Si CJK detectado -> regenerar en modo greedy (do_sample=False)
+  3. Si tras regenerar aun hay CJK -> truncar en el primer caracter CJK
+
+Salida         : string en espanol, maximo ~500 tokens nuevos
+
+================================================================================
+NODO 12 -- SALIDA: Informe Estructurado
+================================================================================
+Archivo        : report_generator.py:381-420 (template / generado por LLM)
+
+Secciones del informe (5, segun ACR BI-RADS Atlas):
+
+  1. TECNICA
+     Mamografia digital en proyecciones CC (craneocaudal) y MLO
+     (mediolateral oblicua).
+
+  2. COMPOSICION MAMARIA
+     Descripcion de densidad segun categoria ACR (A/B/C/D) + nota
+     clinica si es C o D (densidad elevada reduce sensibilidad y
+     es factor de riesgo independiente).
+
+  3. HALLAZGOS
+     Descripcion acorde al nivel BI-RADS, SIN morfologia inventada:
+       BR 1-2 -> "no se identifican hallazgos sospechosos de malignidad"
+       BR 3   -> "hallazgo probablemente benigno que amerita seguimiento"
+       BR 4-5 -> "hallazgo con caracteristicas sospechosas que amerita
+                  evaluacion adicional"
+     + Score de riesgo de malignidad si se proporciona.
+
+  4. IMPRESION
+     Categoria BI-RADS {1-5} con justificacion clinica.
+
+  5. RECOMENDACION
+     Conducta clinica ACR estandar para ese nivel BI-RADS.
+
+================================================================================
+RESUMEN DE UNA LINEA (nodos y flechas para el diagrama)
+================================================================================
+
+DICOM (16-bit)
+  -> [VOI LUT + MONO1-inv + min-max->uint8 -> PIL RGB]       (data_loading.py:169)
+  -> [CLAHE(clipLimit=2.0, tile=8x8) + Resize(1520x912)
+      + ToTensor + ImageNet-norm]                            (data_loading.py:48)
+  -> tensor [1, 3, 1520, 912]
+  -> [EfficientNet-B5: extract_features -> GAP]              (models.py:195)
+  -> features [1, 2048]
+  -> [Linear(2048->256->5)  ||  Linear(2048->256->4)]        (models.py:221)
+  -> logits [1,5] BI-RADS  +  logits [1,4] densidad
+  -> [softmax + argmax]
+  -> probs[5] + probs[4] + birads_idx(0-4) + density_idx(0-3) + conf
+  -> [P(idx=3) + P(idx=4)] -> malignancy_score en [0,1]
+  -> [umbral 0.120] -> decision binaria benigno/sospechoso   (threshold_tuning.py:56)
+  -> [birads_level = idx+1, density_desc, recommendation]
+  -> [build_query: "mammography BI-RADS N density_text keywords"] (rag.py:708)
+  -> [PubMedBERT embed -> [1,768] + FAISS-IndexFlatIP top-3] (rag.py:657)
+  -> 3 fragmentos de literatura medica
+  -> [prompt: system + RAG-context + findings_block
+              + instruction (ChatML)]                        (report_generator.py:299)
+  -> [Qwen2.5-7B bfloat16, T=0.1, top_p=0.9, max_tokens=500
+      + CJK-guard]                                           (report_generator.py:285)
+  -> INFORME (TECNICA / COMPOSICION MAMARIA / HALLAZGOS
+              / IMPRESION / RECOMENDACION)
+
+================================================================================
+CORRECCIONES A LA DESCRIPCION ORIGINAL
+================================================================================
+
+Lo que se describio           | Lo que hace el codigo real
+------------------------------|---------------------------------------------
+"score P(BR4)+P(BR5)"         | CORRECTO. birads_probs[3] + birads_probs[4]
+                              | (indices 3 y 4 = BI-RADS 4 y 5)
+------------------------------|---------------------------------------------
+"umbral 0.120"                | CORRECTO para el run documentado en
+                              | experiment_detail.json (2026-06-06).
+                              | Hay runs posteriores con 0.265 y 0.295.
+                              | El umbral canonico de exp08 es 0.120.
+------------------------------|---------------------------------------------
+"top-k RAG"                   | La constante TOP_K=5 en rag.py es el
+                              | default del ReportRetriever, pero
+                              | ReportGenerator usa rag_top_k=3.
+                              | El pipeline de inferencia usa top-k=3.
+------------------------------|---------------------------------------------
+"query incluye hallazgos      | NO. findings=[] explicito en
+ morfologicos"                | report_generator.py:250. El modelo no
+                              | predice morfologia. La query solo lleva
+                              | BI-RADS + densidad + keywords ACR.
+------------------------------|---------------------------------------------
+"temperatura LLM"             | temperature=0.1 (baja, para evitar que
+                              | Qwen salte al chino con alta aleatoriedad)
+------------------------------|---------------------------------------------
+Orden preproc                 | Orden real:
+"VOI LUT, CLAHE, norm, resize"| (1) VOI LUT -> MONO1-inv -> min-max ->
+                              |     uint8 -> PIL RGB
+                              | (2) CLAHE -> Resize -> ToTensor -> Normalize
+                              | CLAHE se aplica sobre PIL ya convertida,
+                              | antes del resize de torchvision.
+================================================================================
