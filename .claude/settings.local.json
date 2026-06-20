@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E '\\\\.\\(py|ipynb|json\\)$')",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}
