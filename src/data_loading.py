@@ -145,9 +145,20 @@ def apply_clahe(pil_image):
 ## Carga de imagenes DICOM de VinDr
 ## ============================================================
 
+def _minmax_to_uint8_rgb(arr: np.ndarray):
+    ## Min-max por imagen a [0,255] uint8 y replica a RGB.
+    ## Identico al escalado del path DICOM (lineas 207-210 de _load_dicom_as_pil).
+    from PIL import Image
+    arr = arr.astype(np.float32)
+    a_min, a_max = arr.min(), arr.max()
+    if a_max > a_min:
+        arr = (arr - a_min) / (a_max - a_min) * 255.0
+    return Image.fromarray(arr.astype(np.uint8)).convert("RGB")
+
+
 def load_image_as_pil(image_path: str):
     ##
-    ## Carga una imagen DICOM de VinDr y la retorna como PIL Image RGB de 8 bits
+    ## Carga una imagen y la retorna como PIL Image RGB de 8 bits.
     ##
     ## VinDr-Mammo distribuye las imagenes en formato DICOM de 16 bits. La
     ## conversion a 8 bits aplica el VOI LUT (windowing) del DICOM si esta
@@ -162,8 +173,12 @@ def load_image_as_pil(image_path: str):
     if suffix in (".dcm", ".dicom"):
         return _load_dicom_as_pil(image_path)
     else:
-        ## Por si en algun momento se usan PNG preprocesados
-        return Image.open(image_path).convert("RGB")
+        pil = Image.open(image_path)
+        if pil.mode in ("I;16", "I;16B", "I"):
+            ## PNG de 16-bit (p.ej. DDSM): convert("RGB") satura uint16 a 255.
+            ## Aplicar min-max identico al path DICOM antes de convertir.
+            return _minmax_to_uint8_rgb(np.array(pil))
+        return pil.convert("RGB")
 
 
 def _load_dicom_as_pil(image_path: str):
