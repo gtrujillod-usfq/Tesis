@@ -24,6 +24,10 @@ _XAI_DIR     = Path(__file__).resolve().parent          ## Tesis/XAI/xai/
 _TESIS_ROOT  = _XAI_DIR.parent.parent                   ## Tesis/
 _SRC_DIR     = _TESIS_ROOT / 'src'
 
+## xai/ se agrega para que los imports internos (from config_xai import, from carga_modelo
+## import) funcionen tanto al ejecutar como script como al importar como paquete.
+if str(_XAI_DIR) not in sys.path:
+    sys.path.insert(0, str(_XAI_DIR))
 if str(_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(_SRC_DIR))
 

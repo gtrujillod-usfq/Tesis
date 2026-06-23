@@ -19,6 +19,8 @@
 ##   (sospechosos BR4-5 vs benignos) y reporta Hit Rate por grupo.
 
 import logging
+from ast import literal_eval
+from collections import Counter
 from pathlib import Path
 from typing import Optional, Callable
 
@@ -42,85 +44,263 @@ except ImportError:
     def _progreso(iterable, desc='', total=None):
         return iterable
 
-from config_xai import OUT_RAG, OUT_FIGURAS, OUT_TABLAS, TEST_CSV
+from config_xai import (
+    OUT_RAG, OUT_FIGURAS, OUT_TABLAS, TEST_CSV, FINDING_ANNOTATIONS_CSV,
+)
 from atribucion_rag import cargar_atribucion_rag
 
 logger = logging.getLogger(__name__)
 
 
 ## =========================================================
-## Muestra estratificada por BI-RADS predicho
+## Conjunto de anclaje para el analisis RAG
 ## =========================================================
 
-def crear_muestra_rag(test_df=None, n_por_clase=40, seed=42):
+def _cargar_preds_anotadas(ann_df, test_df, model, transform, device,
+                            cache_path):
     """
-    Construye una muestra estratificada SIN REEMPLAZO del test set para el analisis RAG.
+    Calcula o carga desde cache las predicciones exp08 para las imagenes
+    anotadas con finding real.
 
-    Estrategia:
-      - Por cada BI-RADS de referencia (col 'birads', indice 0-4):
-        tomar min(n_por_clase, disponibles) filas sin reemplazo.
-        No se sobremuestrea: el n real por clase puede ser menor que n_por_clase.
-      - Los image_id son unicos dentro de cada clase (no hay duplicados).
-
-    Razon: el Shapley sobre Qwen2.5 es costoso (8 forward passes por imagen).
-    Trabajar con la distribucion natural de clases evita artefactos de muestreo
-    y permite reportar la tasa de coincidencia POR CLASE sin sesgos.
+    Si cache_path existe, lo devuelve directamente sin tocar el modelo.
+    Si no existe, clasifica con el modelo y persiste el cache.
 
     Parametros
     ----------
-    test_df : pd.DataFrame o None
-        Si None, carga desde TEST_CSV. Debe tener columna 'birads' (0-4).
-    n_por_clase : int
-        Maximo de filas por clase; el n real es min(n_por_clase, disponibles).
-    seed : int
-        Semilla aleatoria para reproducibilidad.
+    ann_df : pd.DataFrame
+        finding_annotations.csv ya cargado.
+    test_df : pd.DataFrame
+        test_set_vindr.csv ya cargado (para obtener image_path).
+    model : MammoVLM o None
+        Si None y el cache no existe, lanza RuntimeError.
+    transform : MammoCLIPTransform o None
+        Transformacion de inferencia; requerida si se computa.
+    device : str
+    cache_path : Path
+        Ruta de parquet de cache.
 
     Retorna
     -------
-    pd.DataFrame con columnas del test_df original mas 'birads_clase' (0-4).
-    Informe el n real por clase via logging.
+    pd.DataFrame con columnas: image_id, birads_pred, malignancy_score.
     """
+    cache_path = Path(cache_path)
+    if cache_path.exists():
+        logger.info("Cargando predicciones desde cache: %s", cache_path)
+        return pd.read_parquet(str(cache_path))
+
+    if model is None or transform is None:
+        raise RuntimeError(
+            f"Cache no encontrado en {cache_path} y model/transform son None. "
+            "Pasa el modelo cargado o genera el cache primero."
+        )
+
+    import torch
+    from data_loading import load_image_as_pil
+
+    ## Imagenes con finding real en el test split
+    has_finding = ann_df[
+        ann_df['split'] == 'test'
+    ].copy()
+    has_finding = has_finding[
+        has_finding['finding_categories'].notna() &
+        (has_finding['finding_categories'] != '[]') &
+        (has_finding['finding_categories'] != "['No Finding']")
+    ]
+    id2path = dict(zip(test_df['image_id'], test_df['image_path']))
+    image_ids = has_finding['image_id'].unique()
+
+    results = []
+    model.eval()
+    for img_id in _progreso(image_ids, desc='Clasificando imagenes anotadas'):
+        img_path = id2path.get(img_id)
+        if img_path is None:
+            continue
+        try:
+            pil_img = load_image_as_pil(img_path)
+            img_t   = transform(pil_img).unsqueeze(0).to(device)
+            with torch.no_grad():
+                out   = model(img_t)
+                probs = torch.softmax(out['birads'][0], dim=-1)
+            results.append({
+                'image_id':         img_id,
+                'birads_pred':      int(torch.argmax(probs).item()),
+                'malignancy_score': float(probs[3].item() + probs[4].item()),
+            })
+        except Exception as exc:
+            logger.warning("Error clasificando %s: %s", img_id, exc)
+
+    pred_df = pd.DataFrame(results)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    pred_df.to_parquet(str(cache_path), index=False)
+    logger.info("Predicciones persistidas en %s (%d imagenes).", cache_path, len(pred_df))
+    return pred_df
+
+
+def construir_conjunto_rag(
+    ann_df=None,
+    test_df=None,
+    pred_df=None,
+    model=None,
+    transform=None,
+    device='cpu',
+    pred_cache_path=None,
+    cap_grupo_b=60,
+    seed=42,
+    out_dir=None,
+):
+    """
+    Construye el conjunto de anclaje para el analisis RAG sobre imagenes con
+    finding anotado en finding_annotations.csv.
+
+    Grupos:
+      A 'predicho_sospechoso': birads_pred in {3,4} (todos los disponibles).
+      B 'control_fn':          birads_pred in {0,1,2} con finding_birads
+                               real in {4,5} (falsos negativos). Cap a
+                               cap_grupo_b filas, estratificando por
+                               finding_category si hay excedente.
+
+    La columna de agrupacion es 'birads_pred' en TODO el flujo: no se crea
+    ninguna 'birads_clase' derivada del birads de referencia.
+
+    Parametros
+    ----------
+    ann_df : pd.DataFrame o None
+        finding_annotations.csv. Si None, carga desde FINDING_ANNOTATIONS_CSV.
+    test_df : pd.DataFrame o None
+        test_set_vindr.csv. Si None, carga desde TEST_CSV.
+    pred_df : pd.DataFrame o None
+        Predicciones ya calculadas (image_id, birads_pred, malignancy_score).
+        Si None, busca en pred_cache_path o computa con model+transform.
+    model : MammoVLM o None
+        Requerido si pred_df es None y no existe cache.
+    transform : MammoCLIPTransform o None
+        Requerido junto con model.
+    device : str
+    pred_cache_path : Path o None
+        Cache de predicciones. Por defecto: OUT_RAG / 'preds_anotadas.parquet'.
+    cap_grupo_b : int
+        Maximo de imagenes en Grupo B.
+    seed : int
+    out_dir : Path o None
+        Directorio de salida. Por defecto OUT_RAG.
+
+    Retorna
+    -------
+    pd.DataFrame con columnas:
+        image_id, birads_pred, malignancy_score, finding_birads,
+        finding_categories (lista de str), grupo ('A'/'B').
+    Persiste el conjunto como conjunto_rag.csv en out_dir.
+    """
+    ## --- Cargar datos base ---
+    if ann_df is None:
+        ann_df = pd.read_csv(str(FINDING_ANNOTATIONS_CSV))
     if test_df is None:
         test_df = pd.read_csv(str(TEST_CSV))
 
-    rng = np.random.default_rng(seed)
-    partes = []
+    ## --- Predicciones ---
+    if pred_df is None:
+        _cache = Path(pred_cache_path) if pred_cache_path else OUT_RAG / 'preds_anotadas.parquet'
+        pred_df = _cargar_preds_anotadas(ann_df, test_df, model, transform, device, _cache)
 
-    col_birads = 'birads'
-    if col_birads not in test_df.columns:
-        raise ValueError(
-            f"Columna '{col_birads}' no encontrada en test_df. "
-            f"Columnas disponibles: {list(test_df.columns)}"
+    ## --- Ground truth: imagenes anotadas del test split ---
+    ann_test = ann_df[ann_df['split'] == 'test'].copy()
+    ann_test = ann_test[
+        ann_test['finding_categories'].notna() &
+        (ann_test['finding_categories'] != '[]') &
+        (ann_test['finding_categories'] != "['No Finding']")
+    ]
+
+    ## finding_birads numerico para el filtro de Grupo B
+    ann_test['_fb_num'] = (
+        ann_test['finding_birads']
+        .astype(str)
+        .str.extract(r'(\d+)', expand=False)
+        .astype('Int64')
+    )
+
+    ## Agregar por image_id: finding_birads = el mas alto, categories = union
+    def _max_birads(series):
+        nums = series.dropna()
+        return int(nums.max()) if len(nums) else pd.NA
+
+    fb_max = (ann_test.groupby('image_id')['_fb_num']
+              .apply(_max_birads)
+              .rename('finding_birads_num')
+              .reset_index())
+
+    cats_agg = {}
+    for img_id, grp in ann_test.groupby('image_id'):
+        cats = []
+        for val in grp['finding_categories']:
+            try:
+                cats.extend(literal_eval(val))
+            except Exception:
+                cats.append(str(val))
+        cats_agg[img_id] = sorted(set(cats))
+
+    ## Preservar label string de finding_birads (el mas alto)
+    fb_str = (ann_test.sort_values('_fb_num', ascending=False)
+              .drop_duplicates('image_id')[['image_id', 'finding_birads']]
+              .rename(columns={'finding_birads': 'finding_birads_str'}))
+
+    ## Join predicciones + ground truth
+    base = pred_df.merge(fb_max, on='image_id', how='inner')
+    base = base.merge(fb_str, on='image_id', how='left')
+    base['finding_categories'] = base['image_id'].map(cats_agg)
+
+    ## --- Grupo A: predichos sospechosos ---
+    grupo_a = base[base['birads_pred'].isin([3, 4])].copy()
+    grupo_a['grupo'] = 'A'
+    logger.info("Grupo A (predicho_sospechoso): %d imagenes.", len(grupo_a))
+
+    ## --- Grupo B: falsos negativos ---
+    fn_pool = base[
+        base['birads_pred'].isin([0, 1, 2]) &
+        base['finding_birads_num'].isin([4, 5])
+    ].copy()
+    logger.info("Grupo B pool (birads_pred<3 + finding_birads>=4): %d imagenes.", len(fn_pool))
+
+    if len(fn_pool) > cap_grupo_b:
+        ## Estratificar por finding_category para no sesgar hacia Mass
+        ## Explota lista -> una fila por categoria; selecciona uniformemente
+        rng = np.random.default_rng(seed)
+        fn_pool = fn_pool.copy()
+        fn_pool['_primary_cat'] = fn_pool['finding_categories'].apply(
+            lambda cats: cats[0] if isinstance(cats, list) and cats else 'Unknown'
         )
+        partes_b = []
+        cats_unicas = fn_pool['_primary_cat'].unique()
+        cuota = max(1, cap_grupo_b // len(cats_unicas))
+        for cat in cats_unicas:
+            sub = fn_pool[fn_pool['_primary_cat'] == cat]
+            n_sel = min(cuota, len(sub))
+            idx   = rng.choice(len(sub), size=n_sel, replace=False)
+            partes_b.append(sub.iloc[idx])
+        grupo_b = pd.concat(partes_b, ignore_index=True).head(cap_grupo_b)
+    else:
+        grupo_b = fn_pool.copy()
 
-    ## Garantizar image_id unicos antes de estratificar
-    col_id = 'image_id'
-    if col_id in test_df.columns:
-        test_df = test_df.drop_duplicates(subset=col_id)
+    grupo_b['grupo'] = 'B'
+    logger.info("Grupo B (control_fn, cap=%d): %d imagenes.", cap_grupo_b, len(grupo_b))
 
-    for clase in range(5):
-        subset = test_df[test_df[col_birads] == clase].copy()
-        n_disp = len(subset)
+    ## --- Unir y limpiar ---
+    cols = ['image_id', 'birads_pred', 'malignancy_score',
+            'finding_birads_str', 'finding_categories', 'grupo']
+    conjunto = (
+        pd.concat([grupo_a[cols], grupo_b[cols]], ignore_index=True)
+        .rename(columns={'finding_birads_str': 'finding_birads'})
+    )
 
-        if n_disp == 0:
-            logger.warning("Clase BI-RADS %d: 0 casos disponibles en el test set.", clase)
-            continue
+    ## --- Persistir ---
+    if out_dir is None:
+        out_dir = OUT_RAG
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ruta = out_dir / 'conjunto_rag.csv'
+    conjunto.to_csv(str(ruta), index=False, encoding='utf-8')
+    logger.info("Conjunto RAG guardado: %s (%d filas).", ruta, len(conjunto))
 
-        ## Submuestreo SIN reemplazo; n real = min(n_por_clase, disponibles)
-        n_sel = min(n_por_clase, n_disp)
-        idx   = rng.choice(n_disp, size=n_sel, replace=False)
-        seleccion = subset.iloc[idx].copy()
-        seleccion['birads_clase'] = clase
-
-        logger.info("Clase BI-RADS %d: %d disponibles, seleccionados %d.", clase, n_disp, n_sel)
-        partes.append(seleccion)
-
-    if not partes:
-        raise RuntimeError("No se encontraron casos en ninguna clase BI-RADS.")
-
-    muestra = pd.concat(partes, ignore_index=True)
-    logger.info("Muestra RAG total: %d casos unicos.", len(muestra))
-    return muestra
+    return conjunto
 
 
 ## =========================================================
@@ -285,7 +465,8 @@ def calcular_resumen_rag(df_metricas):
 ## Pointing Game estratificado por finding_birads (Bloque A)
 ## =========================================================
 
-def evaluar_pointing_game_estratificado(attr_load_func, cajas_df):
+def evaluar_pointing_game_estratificado(attr_load_func, cajas_df,
+                                        transform=None, device='cpu'):
     """
     Evalua el Pointing Game de la cabeza BI-RADS estratificado por finding_birads,
     para IG y Grad-CAM por separado.
@@ -308,7 +489,12 @@ def evaluar_pointing_game_estratificado(attr_load_func, cajas_df):
         Funcion que carga las atribuciones (cargar_atribucion de atribucion_clasificador).
     cajas_df : pd.DataFrame
         Salida de metricas_clasificador.preparar_cajas_test().
-        Debe tener columnas: image_id, finding_birads, xmin_s, ymin_s, xmax_s, ymax_s.
+        Debe tener columnas: image_id, image_path, finding_birads, xmin_s, ymin_s, xmax_s, ymax_s.
+    transform : MammoCLIPTransform o None
+        Si se proporciona, se carga la imagen y se aplica mascara de mama antes del
+        argmax. Sin mascara, GradCAM puede devolver el maximo en esquinas negras
+        (artefacto confirmado en exp08; contamina el hit_rate de GradCAM).
+    device : str
 
     Retorna
     -------
@@ -316,6 +502,8 @@ def evaluar_pointing_game_estratificado(attr_load_func, cajas_df):
         metodo in {'ig', 'gradcam'}; grupo in {'sospechoso', 'benigno'}.
     """
     from config_xai import IMAGE_HEIGHT, IMAGE_WIDTH, OUT_BIRADS
+    from metricas_clasificador import mascara_mama, _tensor_a_gris
+    from carga_modelo import cargar_imagen
 
     H, W = IMAGE_HEIGHT, IMAGE_WIDTH
 
@@ -324,7 +512,21 @@ def evaluar_pointing_game_estratificado(attr_load_func, cajas_df):
             data = attr_load_func(image_id, 'birads', str(OUT_BIRADS))
         except FileNotFoundError:
             return None
+
         attr_map = data[method]   ## 'ig' o 'gradcam'
+
+        ## Mascara de mama: excluye esquinas negras y etiquetas del argmax.
+        ## Artefacto confirmado en exp08: argmax GradCAM en fila=0/1504, col=896
+        ## (borde superior/inferior derecho) en lugar del tejido mamario.
+        if transform is not None and 'image_path' in group_df.columns:
+            try:
+                img_path = group_df['image_path'].iloc[0]
+                img_t    = cargar_imagen(img_path, transform, device)
+                mascara  = mascara_mama(_tensor_a_gris(img_t))
+                attr_map = attr_map * mascara
+            except Exception:
+                pass   ## si falla la mascara, usar mapa crudo sin interrupcion
+
         flat_idx = int(np.argmax(attr_map.flatten()))
         row = flat_idx // W
         col = flat_idx  % W
