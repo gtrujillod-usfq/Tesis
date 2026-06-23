@@ -19,6 +19,7 @@ from config_xai import (
     OUT_BIRADS, OUT_DENSITY, OUT_FIGURAS,
 )
 from carga_modelo import cargar_imagen
+from metricas_clasificador import mascara_mama
 
 logger = logging.getLogger(__name__)
 
@@ -207,18 +208,29 @@ def figura_grid_seleccion(
                 axes[i, j].set_title(f'{img_id} -- sin datos', fontsize=7)
             continue
 
-        ig_h = _norm_ig(attr['ig'])
-        gc_h = _norm_gradcam(attr['gradcam'])
-
         gray = None
         if img_path:
             img_t = cargar_imagen(img_path, transform, device)
             gray  = _a_gris(img_t)
         base = gray if gray is not None else np.zeros((IMAGE_HEIGHT, IMAGE_WIDTH))
 
-        ## HIT/MISS por metodo
-        row_ig, col_ig = _max_pixel_rc(attr['ig'])
-        row_gc, col_gc = _max_pixel_rc(attr['gradcam'])
+        ## Mascara de mama: anula atribucion en el fondo negro antes de normalizar.
+        ## Garantiza que el calor mostrado y el marcador de maximo sean anatomicos.
+        ## Identica para IG y Grad-CAM -> colorbar y contornos directamente comparables.
+        if gray is not None:
+            mask   = mascara_mama(gray)
+            ig_raw = attr['ig'] * mask
+            gc_raw = attr['gradcam'] * mask
+        else:
+            ig_raw = attr['ig']
+            gc_raw = attr['gradcam']
+
+        ig_h = _norm_ig(ig_raw)
+        gc_h = _norm_gradcam(gc_raw)
+
+        ## HIT/MISS por metodo (argmax sobre mapa enmascarado)
+        row_ig, col_ig = _max_pixel_rc(ig_raw)
+        row_gc, col_gc = _max_pixel_rc(gc_raw)
         hit_ig = _es_hit(row_ig, col_ig, cajas)
         hit_gc = _es_hit(row_gc, col_gc, cajas)
 
@@ -233,7 +245,7 @@ def figura_grid_seleccion(
         ## Panel 1: IG overlay (alpha por magnitud + iso-contorno cyan al 70%)
         _overlay_heat(axes[i, 1], base, ig_h)
         _dibujar_cajas(axes[i, 1], cajas)
-        _marcar_max(axes[i, 1], attr['ig'])
+        _marcar_max(axes[i, 1], ig_raw)   ## argmax dentro de la mama
         axes[i, 1].set_title(
             f'IG ({head}) -- {"HIT" if hit_ig else "MISS"}', fontsize=7
         )
@@ -242,7 +254,7 @@ def figura_grid_seleccion(
         ## Panel 2: Grad-CAM overlay (mismo esquema que IG para comparabilidad)
         _overlay_heat(axes[i, 2], base, gc_h)
         _dibujar_cajas(axes[i, 2], cajas)
-        _marcar_max(axes[i, 2], attr['gradcam'])
+        _marcar_max(axes[i, 2], gc_raw)   ## argmax dentro de la mama
         axes[i, 2].set_title(
             f'Grad-CAM ({head}) -- {"HIT" if hit_gc else "MISS"}', fontsize=7
         )
@@ -308,10 +320,14 @@ def figura_dual_head(
     attr_b = attr_load_func(image_id, 'birads',  str(OUT_BIRADS))
     attr_d = attr_load_func(image_id, 'density', str(OUT_DENSITY))
 
-    ig_b  = _norm_ig(attr_b['ig'])
-    gc_b  = _norm_gradcam(attr_b['gradcam'])
-    ig_d  = _norm_ig(attr_d['ig'])
-    gc_d  = _norm_gradcam(attr_d['gradcam'])
+    ## Mascara de mama: una sola mascara para ambas cabezas (misma imagen).
+    ## Elimina calor en el fondo negro y garantiza que los maximos sean anatomicos.
+    mask = mascara_mama(gray)
+
+    ig_b  = _norm_ig(attr_b['ig']      * mask)
+    gc_b  = _norm_gradcam(attr_b['gradcam'] * mask)
+    ig_d  = _norm_ig(attr_d['ig']      * mask)
+    gc_d  = _norm_gradcam(attr_d['gradcam'] * mask)
 
     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 
@@ -326,14 +342,14 @@ def figura_dual_head(
     ## [0,1] IG birads (alpha por magnitud + iso-contorno cyan al 70%)
     _overlay_heat(axes[0, 1], gray, ig_b)
     _dibujar_cajas(axes[0, 1], cajas_df_imagen)
-    _marcar_max(axes[0, 1], attr_b['ig'])
+    _marcar_max(axes[0, 1], attr_b['ig'] * mask)   ## argmax dentro de la mama
     axes[0, 1].set_title('IG -- cabeza BI-RADS\n(focal sobre la lesion)', fontsize=8)
     axes[0, 1].axis('off')
 
     ## [0,2] Grad-CAM birads (mismo esquema que IG)
     _overlay_heat(axes[0, 2], gray, gc_b)
     _dibujar_cajas(axes[0, 2], cajas_df_imagen)
-    _marcar_max(axes[0, 2], attr_b['gradcam'])
+    _marcar_max(axes[0, 2], attr_b['gradcam'] * mask)   ## argmax dentro de la mama
     axes[0, 2].set_title('Grad-CAM -- cabeza BI-RADS\n(focal sobre la lesion)', fontsize=8)
     axes[0, 2].axis('off')
 
@@ -346,13 +362,13 @@ def figura_dual_head(
 
     ## [1,1] IG density (alpha por magnitud + iso-contorno cyan al 70%)
     _overlay_heat(axes[1, 1], gray, ig_d)
-    _marcar_max(axes[1, 1], attr_d['ig'])
+    _marcar_max(axes[1, 1], attr_d['ig'] * mask)   ## argmax dentro de la mama
     axes[1, 1].set_title('IG -- cabeza Densidad\n(difuso sobre tejido)', fontsize=8)
     axes[1, 1].axis('off')
 
     ## [1,2] Grad-CAM density (mismo esquema)
     _overlay_heat(axes[1, 2], gray, gc_d)
-    _marcar_max(axes[1, 2], attr_d['gradcam'])
+    _marcar_max(axes[1, 2], attr_d['gradcam'] * mask)   ## argmax dentro de la mama
     axes[1, 2].set_title('Grad-CAM -- cabeza Densidad\n(difuso sobre tejido)', fontsize=8)
     axes[1, 2].axis('off')
 
