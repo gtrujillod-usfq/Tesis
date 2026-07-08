@@ -1,0 +1,222 @@
+[
+  {
+    "archivo": "lesion_01.png",
+    "study_id": "15a411e94e743361a5725ccf6b728ded",
+    "image_id": "e8807d2cd8bceca2378375fb986cf578",
+    "laterality": "R",
+    "view_position": "MLO",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Mass']",
+    "box_original_xmin": 1179.3322710268144,
+    "box_original_ymin": 1022.4478676946056,
+    "box_original_xmax": 1616.315264189224,
+    "box_original_ymax": 1601.8361282002377,
+    "box_escalada_xmin": 535,
+    "box_escalada_ymin": 553,
+    "box_escalada_xmax": 733,
+    "box_escalada_ymax": 866,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  },
+  {
+    "archivo": "lesion_02.png",
+    "study_id": "843abf53ca13b08410085e28fe4de489",
+    "image_id": "15c8e59fdfafb3deefc80c5a9e8a42d0",
+    "laterality": "R",
+    "view_position": "CC",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Suspicious Calcification']",
+    "box_original_xmin": 1046.8661705404847,
+    "box_original_ymin": 1273.0896324308608,
+    "box_original_xmax": 1922.1410163268863,
+    "box_original_ymax": 2125.0802622471288,
+    "box_escalada_xmin": 475,
+    "box_escalada_ymin": 688,
+    "box_escalada_xmax": 871,
+    "box_escalada_ymax": 1149,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  },
+  {
+    "archivo": "lesion_03.png",
+    "study_id": "ae4b6f49514c32216a8aabb4b3ad026a",
+    "image_id": "ac315834dc489efe6d1e96d93ae8369d",
+    "laterality": "R",
+    "view_position": "MLO",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Mass']",
+    "box_original_xmin": 1200.7099609375,
+    "box_original_ymin": 1808.1400146484,
+    "box_original_xmax": 1753.5200195312,
+    "box_original_ymax": 2250.1000976562,
+    "box_escalada_xmin": 544,
+    "box_escalada_ymin": 977,
+    "box_escalada_xmax": 795,
+    "box_escalada_ymax": 1216,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  },
+  {
+    "archivo": "lesion_04.png",
+    "study_id": "c659e0e01ed8e0ba6dc0adf5418eeaa9",
+    "image_id": "b170cb834c8bccc382bc8a1b667e6100",
+    "laterality": "R",
+    "view_position": "MLO",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Suspicious Calcification']",
+    "box_original_xmin": 705.9010009765599,
+    "box_original_ymin": 1199.6800537109,
+    "box_original_xmax": 1400.0400390625,
+    "box_original_ymax": 2267.3400878906,
+    "box_escalada_xmin": 320,
+    "box_escalada_ymin": 648,
+    "box_escalada_xmax": 635,
+    "box_escalada_ymax": 1226,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  },
+  {
+    "archivo": "lesion_05.png",
+    "study_id": "cf70a8015962943d8637b8b5db34ff25",
+    "image_id": "48d67e59b596a5d42b2ca037839979e1",
+    "laterality": "L",
+    "view_position": "MLO",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Mass']",
+    "box_original_xmin": 391.94299316406,
+    "box_original_ymin": 1326.2299804688,
+    "box_original_xmax": 867.648089107487,
+    "box_original_ymax": 1821.5471536052405,
+    "box_escalada_xmin": 178,
+    "box_escalada_ymin": 717,
+    "box_escalada_xmax": 393,
+    "box_escalada_ymax": 985,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  },
+  {
+    "archivo": "lesion_06.png",
+    "study_id": "d8245da0e82b44954f356b5435d965d9",
+    "image_id": "09025dbf5abd08828ecd4ebf03724341",
+    "laterality": "R",
+    "view_position": "CC",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Suspicious Calcification']",
+    "box_original_xmin": 1065.4300537109,
+    "box_original_ymin": 1304.5400390625,
+    "box_original_xmax": 1869.0999755859,
+    "box_original_ymax": 2120.1799316406,
+    "box_escalada_xmin": 483,
+    "box_escalada_ymin": 705,
+    "box_escalada_xmax": 847,
+    "box_escalada_ymax": 1146,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  },
+  {
+    "archivo": "lesion_07.png",
+    "study_id": "31937d26eec6ebdceb4c4d676fd06018",
+    "image_id": "b6bc74e44e775f7ba981fb608fc16ef6",
+    "laterality": "R",
+    "view_position": "MLO",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Mass']",
+    "box_original_xmin": 1959.5100097656,
+    "box_original_ymin": 795.56201171875,
+    "box_original_xmax": 2614.6499023438,
+    "box_original_ymax": 1424.6800537109,
+    "box_escalada_xmin": 636,
+    "box_escalada_ymin": 338,
+    "box_escalada_xmax": 848,
+    "box_escalada_ymax": 605,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  },
+  {
+    "archivo": "lesion_08.png",
+    "study_id": "a7dddf85e78c65bac3143d86d3d2d977",
+    "image_id": "f0f3808a479ac5e71f07084bcac83c68",
+    "laterality": "L",
+    "view_position": "MLO",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Suspicious Calcification']",
+    "box_original_xmin": 315.91799926758,
+    "box_original_ymin": 1436.0100097656,
+    "box_original_xmax": 1089.6099853516,
+    "box_original_ymax": 2646.4099121094,
+    "box_escalada_xmin": 102,
+    "box_escalada_ymin": 610,
+    "box_escalada_xmax": 353,
+    "box_escalada_ymax": 1124,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  },
+  {
+    "archivo": "lesion_09.png",
+    "study_id": "d7169c8f349e5c37fc0cf2ce78cdd4cb",
+    "image_id": "69b872a225cb0e218a26a8a313ee3ef4",
+    "laterality": "L",
+    "view_position": "MLO",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Mass']",
+    "box_original_xmin": 462.47799682617006,
+    "box_original_ymin": 1414.7800292969,
+    "box_original_xmax": 951.5201662604898,
+    "box_original_ymax": 1857.7316274000648,
+    "box_escalada_xmin": 210,
+    "box_escalada_ymin": 765,
+    "box_escalada_xmax": 431,
+    "box_escalada_ymax": 1004,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  },
+  {
+    "archivo": "lesion_10.png",
+    "study_id": "ff5c656fb6757b708d64d2ebdd33c421",
+    "image_id": "6cab0db67458b7c2bf4afade630adee5",
+    "laterality": "R",
+    "view_position": "CC",
+    "breast_birads": "BI-RADS 5",
+    "finding_birads": "BI-RADS 5",
+    "finding_categories": "['Suspicious Calcification']",
+    "box_original_xmin": 2031.3699951172,
+    "box_original_ymin": 1349.2600097656,
+    "box_original_xmax": 2804.651349177636,
+    "box_original_ymax": 2383.123424647839,
+    "box_escalada_xmin": 659,
+    "box_escalada_ymin": 573,
+    "box_escalada_xmax": 910,
+    "box_escalada_ymax": 1012,
+    "resolucion_imagen_guardada": [
+      1520,
+      912
+    ]
+  }
+]

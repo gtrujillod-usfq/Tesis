@@ -13,7 +13,8 @@ checkpoints/
 # ── Salidas de experimentos ───────────────────────────────────────────────────
 outputs/
 results/
-experiments/
+experiments/*
+!experiments/seleccion_val/
 Graficos/outputs/
 
 # ── Código obsoleto (interno) ─────────────────────────────────────────────────

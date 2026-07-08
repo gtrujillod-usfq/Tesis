@@ -1,0 +1,217 @@
+{
+  "generado_en_utc": "2026-07-07T02:46:56.779542+00:00",
+  "alcance": "seleccion de modelo por AUC macro one vs rest de la cabeza BI-RADS sobre el conjunto de VALIDACION de VinDr, no sobre el test",
+  "conjunto_validacion": {
+    "funcion_split": "src/train.py:split_train_val",
+    "funcion_reserva_test": "src/train.py:separate_test_set_vindr",
+    "loader_registros": "src/data_loading.py:load_vindr_records",
+    "random_seed": 42,
+    "val_fraction": 0.15,
+    "estratificado_por": "birads",
+    "n_registros_vindr_totales": 20000,
+    "n_test_reservado_split_oficial": 4000,
+    "n_train_val_antes_del_split": 16000,
+    "n_train": 13600,
+    "n_val": 2400
+  },
+  "inventario_checkpoints": {
+    "exp01": {
+      "path": "outputs/experiments/exp01_baseline_encoder_congelado/model.pt",
+      "exists": true,
+      "size_bytes": 349917411,
+      "sha256": "b39de93bf2396320ad9ac1af1e96c754cc9ea6d20b4678074d835e5c95c3a515",
+      "architecture_signature": {
+        "n_keys": 209,
+        "tiene_trunk_vit": true,
+        "tiene_findings_heads": true,
+        "tiene_backbone_efficientnet": false
+      }
+    },
+    "exp02": {
+      "path": "outputs/experiments/exp02_encoder_descongelado_3bloques/model.pt",
+      "exists": true,
+      "size_bytes": 349917475,
+      "sha256": "c6b6dc334ade2283cc3184157c15c97ec59bc1ddee3503376c29c7c34f0967a0",
+      "architecture_signature": {
+        "n_keys": 209,
+        "tiene_trunk_vit": true,
+        "tiene_findings_heads": true,
+        "tiene_backbone_efficientnet": false
+      }
+    },
+    "exp03": {
+      "path": "outputs/experiments/exp03_focal_loss_encoder_congelado/model.pt",
+      "exists": false,
+      "architecture_signature": null
+    },
+    "exp04": {
+      "path": "outputs/experiments/exp04_focal_loss_oversampling/model.pt",
+      "exists": true,
+      "size_bytes": 349917475,
+      "sha256": "308217e2bb160f889e04c922262b352290106fdbae0dd98bb74e771ec24d4bd7",
+      "architecture_signature": {
+        "n_keys": 209,
+        "tiene_trunk_vit": true,
+        "tiene_findings_heads": true,
+        "tiene_backbone_efficientnet": false
+      }
+    },
+    "exp05": {
+      "path": "outputs/experiments/exp05_focal_loss_sin_dmid/model.pt",
+      "exists": true,
+      "size_bytes": 349917475,
+      "sha256": "87bc849f64da992278f48b3774859da798183dbdae5e7e6ead468df9ddd19698",
+      "architecture_signature": {
+        "n_keys": 209,
+        "tiene_trunk_vit": true,
+        "tiene_findings_heads": true,
+        "tiene_backbone_efficientnet": false
+      }
+    },
+    "exp06": {
+      "path": "outputs/experiments/exp06_mammoclip_vindr/model.pt",
+      "exists": true,
+      "size_bytes": 126791736,
+      "sha256": "68e1ff7599cd3d7682c25919353c50df4cc1ce72024863667e18c1c939e9ca1a",
+      "architecture_signature": {
+        "n_keys": 866,
+        "tiene_trunk_vit": false,
+        "tiene_findings_heads": false,
+        "tiene_backbone_efficientnet": true
+      }
+    },
+    "exp07": {
+      "path": "outputs/experiments/exp07_focal_gamma3_weights_agresivos/model.pt",
+      "exists": true,
+      "size_bytes": 126791736,
+      "sha256": "0f4c304b92b296caad8c8c633f2d36e1ce4f981121232837a51a9b91f5804589",
+      "architecture_signature": {
+        "n_keys": 866,
+        "tiene_trunk_vit": false,
+        "tiene_findings_heads": false,
+        "tiene_backbone_efficientnet": true
+      }
+    },
+    "exp08": {
+      "path": "outputs/experiments/exp08_ordinal_sord_qwk_descongelado/model.pt",
+      "exists": true,
+      "size_bytes": 126791736,
+      "sha256": "fc95ab9250647b075120efbd95698f0fb8f0bdd1f07c51f5a8b64d610f90600b",
+      "architecture_signature": {
+        "n_keys": 866,
+        "tiene_trunk_vit": false,
+        "tiene_findings_heads": false,
+        "tiene_backbone_efficientnet": true
+      }
+    },
+    "exp09": {
+      "path": "outputs/experiments/exp09_asymmetric_sord_weighted/model.pt",
+      "exists": true,
+      "size_bytes": 126791736,
+      "sha256": "c9969efd343f0d2fadc2e72b81dc9a8a130c63eb0a26a0ac14afcfad74ca1e76",
+      "architecture_signature": {
+        "n_keys": 866,
+        "tiene_trunk_vit": false,
+        "tiene_findings_heads": false,
+        "tiene_backbone_efficientnet": true
+      }
+    }
+  },
+  "incluidos": {
+    "exp06": "arquitectura Mammo-CLIP EfficientNet-B5, coincide con models.MammoVLM",
+    "exp07": "arquitectura Mammo-CLIP EfficientNet-B5, coincide con models.MammoVLM",
+    "exp08": "arquitectura Mammo-CLIP EfficientNet-B5, coincide con models.MammoVLM",
+    "exp09": "arquitectura Mammo-CLIP EfficientNet-B5, coincide con models.MammoVLM"
+  },
+  "excluidos": {
+    "exp01": "arquitectura ViT tipo BiomedCLIP con findings_heads, no implementada en el codigo actual del repo. src/models.py solo define MammoVLM con encoder Mammo-CLIP EfficientNet-B5 y sin findings_heads. Esta arquitectura previa no existe en git history (un solo commit inicial) ni en la carpeta deprecated/, por lo que no se puede reconstruir con modulos reales del repo.",
+    "exp02": "arquitectura ViT tipo BiomedCLIP con findings_heads, no implementada en el codigo actual del repo. src/models.py solo define MammoVLM con encoder Mammo-CLIP EfficientNet-B5 y sin findings_heads. Esta arquitectura previa no existe en git history (un solo commit inicial) ni en la carpeta deprecated/, por lo que no se puede reconstruir con modulos reales del repo.",
+    "exp03": "sin checkpoint en disco, model.pt no existe",
+    "exp04": "arquitectura ViT tipo BiomedCLIP con findings_heads, no implementada en el codigo actual del repo. src/models.py solo define MammoVLM con encoder Mammo-CLIP EfficientNet-B5 y sin findings_heads. Esta arquitectura previa no existe en git history (un solo commit inicial) ni en la carpeta deprecated/, por lo que no se puede reconstruir con modulos reales del repo.",
+    "exp05": "arquitectura ViT tipo BiomedCLIP con findings_heads, no implementada en el codigo actual del repo. src/models.py solo define MammoVLM con encoder Mammo-CLIP EfficientNet-B5 y sin findings_heads. Esta arquitectura previa no existe en git history (un solo commit inicial) ni en la carpeta deprecated/, por lo que no se puede reconstruir con modulos reales del repo."
+  },
+  "cargabilidad_arquitectura": {
+    "exp06": {
+      "loadable_strict": true,
+      "missing_keys": [],
+      "unexpected_keys": []
+    },
+    "exp07": {
+      "loadable_strict": true,
+      "missing_keys": [],
+      "unexpected_keys": []
+    },
+    "exp08": {
+      "loadable_strict": true,
+      "missing_keys": [],
+      "unexpected_keys": []
+    },
+    "exp09": {
+      "loadable_strict": true,
+      "missing_keys": [],
+      "unexpected_keys": []
+    }
+  },
+  "exp08_correspondencia_epoca_checkpoint": {
+    "checkpoint_evaluado": "outputs/experiments/exp08_ordinal_sord_qwk_descongelado/model.pt",
+    "epoca_del_checkpoint_evaluado": 15,
+    "val_birads_acc_del_checkpoint_evaluado": 0.6920833333333334,
+    "val_birads_acc_registrado_en_notas": 0.6921,
+    "coincide_con_lo_registrado": true,
+    "checkpoint_mejor_val_loss_en_outputs_checkpoints": {
+      "ruta": "outputs/checkpoints/exp08_ordinal_sord_qwk_descongelado/mammovlm_epoch13.pt",
+      "epoca": 13,
+      "val_birads_acc": 0.695,
+      "pesos_de_cabeza_birads_identicos_a_los_evaluados": false
+    }
+  },
+  "exp08_sanity_check": {
+    "reproduced_val_birads_acc": 0.6920833333333334,
+    "registered_val_birads_acc": 0.6920833333333334,
+    "abs_difference": 0.0,
+    "tolerance": 0.01,
+    "passed": true,
+    "eval_time_seconds": 89.00831270217896
+  },
+  "advertencia_comparabilidad": "exp01, exp02, exp04 y exp05 se entrenaron sobre un pool multi-dataset (arquitectura tipo BiomedCLIP con VinDr, CBIS-DDSM, CDD-CESM, DMID e INbreast) y ademas quedan excluidos de este ranking porque su arquitectura no esta implementada en el codigo actual del repo. exp03 queda excluido por no tener checkpoint en disco. Los cuatro experimentos que sobreviven (exp06, exp07, exp08, exp09) se entrenaron unicamente sobre VinDr-Mammo (VinDr-only), por lo que la comparacion entre ellos sobre el val de VinDr es una prueba justa y homogenea en dominio, arquitectura y preprocesamiento. No existe evidencia recuperable en este repo para comparar estos cuatro contra exp01-05 bajo el mismo criterio de validacion.",
+  "ranking_val_auc_macro_descendente": [
+    {
+      "experimento": "exp09",
+      "auc_macro_val": 0.7577793252065587,
+      "accuracy_val": 0.66625,
+      "qwk_val": 0.4606176669982136,
+      "arquitectura": "Mammo-CLIP EfficientNet-B5, 2 bloques finales descongelados, dual head BIRADS(5)/densidad(4)",
+      "dominio_entrenamiento": "VinDr-only",
+      "preprocesamiento": "MammoCLIPTransform 1520x912, CLAHE, normalizacion ImageNet, sin augmentacion"
+    },
+    {
+      "experimento": "exp08",
+      "auc_macro_val": 0.7561153000946775,
+      "accuracy_val": 0.6920833333333334,
+      "qwk_val": 0.4445810678605524,
+      "arquitectura": "Mammo-CLIP EfficientNet-B5, 2 bloques finales descongelados, dual head BIRADS(5)/densidad(4)",
+      "dominio_entrenamiento": "VinDr-only",
+      "preprocesamiento": "MammoCLIPTransform 1520x912, CLAHE, normalizacion ImageNet, sin augmentacion"
+    },
+    {
+      "experimento": "exp06",
+      "auc_macro_val": 0.6769097707438009,
+      "accuracy_val": 0.4675,
+      "qwk_val": 0.19837399105441056,
+      "arquitectura": "Mammo-CLIP EfficientNet-B5, encoder totalmente congelado, dual head BIRADS(5)/densidad(4)",
+      "dominio_entrenamiento": "VinDr-only",
+      "preprocesamiento": "MammoCLIPTransform 1520x912, CLAHE, normalizacion ImageNet, sin augmentacion"
+    },
+    {
+      "experimento": "exp07",
+      "auc_macro_val": 0.6687619481538428,
+      "accuracy_val": 0.24416666666666667,
+      "qwk_val": 0.10571822754655213,
+      "arquitectura": "Mammo-CLIP EfficientNet-B5, encoder totalmente congelado, dual head BIRADS(5)/densidad(4)",
+      "dominio_entrenamiento": "VinDr-only",
+      "preprocesamiento": "MammoCLIPTransform 1520x912, CLAHE, normalizacion ImageNet, sin augmentacion"
+    }
+  ],
+  "exp08_es_numero_uno": false,
+  "numero_uno": "exp09"
+}

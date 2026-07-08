@@ -1,5 +1,6 @@
 ================================================================================
-PIPELINE END-TO-END MammoVLM V2 -- Experimento exp08
+PIPELINE END-TO-END MammoVLM V2 -- Experimento exp08 (condicion C8 en la tesis,
+                                                        modelo definitivo)
 ================================================================================
 Fuente de verdad: experiment_detail.json, data_loading.py, models.py,
                   rag.py, report_generator.py, threshold_tuning.py,

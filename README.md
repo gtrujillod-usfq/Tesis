@@ -17,9 +17,13 @@ informes basado en recuperación de literatura médica:
   con fine-tuning parcial de los últimos 2 bloques convolucionales.
 - **Dual-head de clasificación**: cabezas independientes para BI-RADS y densidad con
   proyección lineal y dropout.
-- **Loss ordinal híbrida**: SORD (Soft Ordinal Labels) + QWK (Quadratic Weighted Kappa)
-  con penalización asimétrica para subclasificaciones clínicamente peligrosas
-  (β = 2.0 para subgrading de BI-RADS 4/5).
+- **Loss ordinal híbrida**: SORD (Soft Ordinal Labels) + QWK (Quadratic Weighted Kappa).
+  Se exploró una variante con penalización asimétrica para subclasificaciones
+  clínicamente peligrosas (β = 2.0 para subgrading de BI-RADS 4/5) — esta variante
+  corresponde a la condición **C9** (`exp09`) de la tesis y fue **descartada** por
+  colapso de métricas en el conjunto de test (ver sección "Resultados principales").
+  El modelo definitivo (condición **C8** / `exp08`, ver abajo) usa SORD+QWK **sin**
+  penalización asimétrica (β = 1.0, simétrico).
 - **Threshold tuning clínico**: optimización del umbral de decisión sobre el conjunto de
   validación para maximizar la sensibilidad a casos malignos (BI-RADS ≥ 4).
 
@@ -35,9 +39,31 @@ informes basado en recuperación de literatura médica:
 
 ---
 
+## Equivalencia de nomenclatura (tesis vs. repo)
+
+La tesis se refiere a las nueve corridas del clasificador como **condiciones
+experimentales C1–C9**; este repositorio conserva los nombres originales
+**exp01–exp09** en directorios, configs y notebooks (no se renombra nada).
+La tabla completa y las notas de equivalencia están en
+[`docs/condition_mapping.md`](docs/condition_mapping.md):
+
+| Etiqueta en la tesis | Directorio real en `outputs/experiments/` |
+|---|---|
+| C1 | `exp01_baseline_encoder_congelado` |
+| C2 | `exp02_encoder_descongelado_3bloques` |
+| C3 | `exp03_focal_loss_encoder_congelado` |
+| C4 | `exp04_focal_loss_oversampling` |
+| C5 | `exp05_focal_loss_sin_dmid` |
+| C6 | `exp06_mammoclip_vindr` |
+| C7 | `exp07_focal_gamma3_weights_agresivos` |
+| C8 | `exp08_ordinal_sord_qwk_descongelado` (**condición definitiva**) |
+| C9 | `exp09_asymmetric_sord_weighted` (regresión descartada) |
+
+---
+
 ## Resultados principales
 
-### Clasificación (exp08 — experimento definitivo)
+### Clasificación (exp08 — condición C8 en la tesis — experimento definitivo)
 
 | Métrica | Valor |
 |---|---|
