@@ -1,0 +1,19 @@
+## requirements.txt -- baseline exploratorio de VLM multimodal
+## Derivado de los imports reales de models.py, train.py y evaluate.py.
+## Sin versiones fijadas a proposito: fijarlas segun el entorno de entrenamiento
+## (en particular torch, que depende de la version de CUDA del H200).
+
+torch
+transformers
+peft
+timm
+numpy
+pandas
+scikit-learn
+nltk
+rouge-score
+tqdm
+
+## Opcional. Solo para atencion acelerada en GPU; requiere un build de CUDA
+## compatible. El codigo detecta su ausencia y sigue funcionando sin ella.
+## flash-attn
