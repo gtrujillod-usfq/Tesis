@@ -17,9 +17,6 @@ experiments/*
 !experiments/seleccion_val/
 Graficos/outputs/
 
-# ── Código obsoleto (interno) ─────────────────────────────────────────────────
-deprecated/
-
 # ── Literatura (PDFs con copyright) ──────────────────────────────────────────
 Libros/
 Papers/
